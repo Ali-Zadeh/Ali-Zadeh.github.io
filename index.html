@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corner Cafe</title>
+    <link rel="stylesheet" href="bootstrap.min.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512x512.png">
+</head>
+<body>
+
+<div class="container mt-5">
+    <h2>Corner Cafe</h2>
+
+    <div class="mb-4">
+        <h4>Expended</h4>
+        <h1 id="balance">R0.00</h1>
+    </div>
+
+    <div class="mb-4">
+        <h3>Add New Transaction</h3>
+        <form id="form" class="row gy-3">
+            <div class="col-12">
+                <label for="amount" class="form-label">Amount</label>
+                <input type="number" id="amount" class="form-control" placeholder="Enter amount" step="any">
+            </div>
+            <div class="col-12">
+                <button class="btn btn-primary">Submit</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="mb-4">
+        <h3>History</h3>
+        <ul id="list" class="list-group"></ul>
+    </div>
+</div>
+
+<script src="bootstrap.bundle.min.js"></script>
+<script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(function (registration) {
+                console.log('Service Worker registered with scope:', registration.scope);
+            })
+            .catch(function (error) {
+                console.error('Service Worker registration failed:', error);
+            });
+    }
+</script>
+<script src="index.js"></script>
+</body>
+</html>
