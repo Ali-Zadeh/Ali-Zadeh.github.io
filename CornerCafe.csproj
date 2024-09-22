@@ -7,7 +7,7 @@
     <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
   </PropertyGroup>
 
-  <PropertyGroup>
+  <PropertyGroup> 
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PublishUrl>docs</PublishUrl>
   </PropertyGroup>
