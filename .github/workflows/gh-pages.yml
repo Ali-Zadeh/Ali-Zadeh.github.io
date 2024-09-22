@@ -1,30 +1,25 @@
 name: gh-pages
-on:
-  push:
-    branches:
-      - main
+
+on: [push]
 
 jobs:
   build:
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up .NET Core
+      - uses: actions/checkout@v2
+      - name: Setup .NET Core
         uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: '8.0.401'  # Replace with your version of .NET
-
-      - name: Install dependencies
-        run: dotnet restore
-
-      - name: Build the project
-        run: dotnet publish -c Release -o out
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+          dotnet-version: 3.1.301
+      - name: Publish with dotnet
+        run: dotnet publish --configuration Release --output build
+      - name: Deploy to Github Pages
+        uses: JamesIves/github-pages-deploy-action@releases/v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./out/wwwroot
+          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          BASE_BRANCH: development # The branch the action should deploy from.
+          BRANCH: main # The branch the action should deploy to.
+          FOLDER: build/wwwroot # The folder the action should deploy.
+          SINGLE_COMMIT: true
