@@ -3,8 +3,8 @@ document.addEventListener('DOMContentLoaded', init);
 function init() {
     const balanceElement = document.getElementById('balance');
     const listElement = document.getElementById('list');
-    const formElement = document.getElementById('form');
     const amountElement = document.getElementById('amount');
+    const addTransactionBtn = document.getElementById('addTransactionBtn');
 
     let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
 
@@ -35,9 +35,7 @@ function init() {
         balanceElement.innerText = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(balance);
     }
 
-    function addTransaction(event) {
-        event.preventDefault();
-
+    function addTransaction() {
         const amount = parseFloat(amountElement.value);
 
         if (isNaN(amount) || amount === 0) {
@@ -83,7 +81,7 @@ function init() {
 
     window.removeTransaction = removeTransaction; // Make the function global
 
-    formElement.addEventListener('submit', addTransaction);
+    addTransactionBtn.addEventListener('click', addTransaction);
 
     function loadTransactions() {
         listElement.innerHTML = '';
