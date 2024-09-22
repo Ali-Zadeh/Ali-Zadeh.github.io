@@ -21,11 +21,4 @@
     <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
   </ItemGroup>
 
-  <!-- Add this ItemGroup to include wwwroot/_content -->
-  <ItemGroup>
-    <Content Include="wwwroot/_content/**">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
 </Project>
