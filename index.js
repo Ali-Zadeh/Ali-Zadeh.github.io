@@ -9,6 +9,7 @@ function init() {
     const archiveListBtn = document.getElementById('ArchiveListBtn');
     const archivedTotalElement = document.getElementById('archivedTotal');
     const archivedListElement = document.getElementById('archivedList');
+    const resetEverythingBtn = document.getElementById('ResetEverythingBtn');
 
     let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
     let archivedTransactions = JSON.parse(localStorage.getItem('archivedTransactions')) || [];
@@ -29,14 +30,14 @@ function init() {
         const date = new Date(transaction.date).toLocaleString();
 
         listItem.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center gap-3">
-                <div class="d-flex justify-content-between align-items-center gap-3 w-100"> 
-                    <p class="m-0 fw-bolder" style="font-size: 0.9rem;">${formattedAmount}</p> 
-                    <p class="m-0 text-secondary" style="font-size: 0.6rem;">${transaction.whom}, ${date}</p>
-                </div>
-                ${!isArchive ? '<button class="btn btn-danger btn-sm px-2 py-0" onclick="removeTransaction(\'' + transaction.id + '\')">-</button>' : ''}
-            </div>
-        `;
+                    <div class="d-flex justify-content-between align-items-center gap-3">
+                        <div class="d-flex justify-content-between align-items-center gap-3 w-100">
+                            <p class="m-0 fw-bolder" style="font-size: 0.9rem;">${formattedAmount}</p>
+                            <p class="m-0 text-secondary" style="font-size: 0.6rem;">${transaction.whom}, ${date}</p>
+                        </div>
+                        ${!isArchive ? '<button class="btn btn-danger btn-sm px-2 py-0" onclick="removeTransaction(\'' + transaction.id + '\')">-</button>' : ''}
+                    </div>
+                `;
 
         listElement.append(listItem);
     }
@@ -127,6 +128,19 @@ function init() {
         updateArchivedTotal();
     }
 
+    function resetEverything() {
+        if (confirm('Are you sure you want to reset everything?')) {
+            localStorage.clear();
+            transactions = [];
+            archivedTransactions = [];
+            listElement.innerHTML = '';
+            archivedListElement.innerHTML = '';
+            updateBalance();
+            updateArchivedTotal();
+            updateArchiveButtonState();
+        }
+    }
+
     function updateArchiveButtonState() {
         archiveListBtn.disabled = transactions.length === 0;
     }
@@ -135,6 +149,7 @@ function init() {
 
     addTransactionBtn.addEventListener('click', addTransaction);
     archiveListBtn.addEventListener('click', archiveTransactions);
+    resetEverythingBtn.addEventListener('click', resetEverything);
 
     amountElement.addEventListener('keypress', (event) => {
         if (event.key === 'Enter') {
