@@ -31,7 +31,7 @@ function init() {
             </div>
         `;
 
-        listElement.appendChild(listItem);
+        listElement.append(listItem);
     }
 
     function updateBalance() {
@@ -55,9 +55,11 @@ function init() {
         };
 
         transactions.push(transaction);
+        transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
         addTransactionDOM(transaction);
         updateBalance();
         updateLocalStorage();
+        loadTransactions();
 
         amountElement.value = '';
     }
@@ -95,6 +97,7 @@ function init() {
 
     function loadTransactions() {
         listElement.innerHTML = '';
+        transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
         transactions.forEach(addTransactionDOM);
         updateBalance();
     }
