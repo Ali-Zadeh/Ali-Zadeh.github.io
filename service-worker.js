@@ -1,4 +1,4 @@
-const CACHE_NAME = 'my-app-cache-v2'; // todo: remember to increment CACHE_NAME to my-app-cache-v2 and so on when you deploy a new version.
+const CACHE_NAME = 'my-app-cache-v3'; // todo: remember to increment CACHE_NAME to my-app-cache-v2 and so on when you deploy a new version.
 const urlsToCache = [
     '/',
     '/index.html',
