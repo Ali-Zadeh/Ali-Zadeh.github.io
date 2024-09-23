@@ -4,6 +4,7 @@ function init() {
     const balanceElement = document.getElementById('balance');
     const listElement = document.getElementById('list');
     const amountElement = document.getElementById('amount');
+    const whomElement = document.getElementById('whom');
     const addTransactionBtn = document.getElementById('addTransactionBtn');
 
     let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
@@ -14,17 +15,20 @@ function init() {
 
     function addTransactionDOM(transaction) {
         const listItem = document.createElement('li');
-        const sign = transaction.amount < 0 ? '-' : '+';
         const absAmount = Math.abs(transaction.amount).toFixed(2);
-        const transactionClass = transaction.amount < 0 ? 'list-group-item-danger' : 'list-group-item-success';
 
-        listItem.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-center', transactionClass);
+        listItem.classList.add('list-group-item');
 
         const date = new Date(transaction.date).toLocaleString();
 
         listItem.innerHTML = `
-            ${sign}R${absAmount} <small>(${date})</small>
-            <button class="btn btn-danger btn-sm" onclick="removeTransaction('${transaction.id}')">x</button>
+            <div class="d-flex justify-content-between align-items-center gap-3">
+                <div class="d-flex justify-content-between align-items-center gap-3 w-100"> 
+                    <p class="m-0 fw-bolder" style="font-size: 1rem;">R${absAmount}</p> 
+                    <p class="m-0" style="font-size: 0.9rem;">${transaction.whom}, ${date}</p>
+                </div>
+                <button class="btn btn-danger btn-sm px-2 py-0" onclick="removeTransaction('${transaction.id}')">-</button>
+            </div>
         `;
 
         listElement.appendChild(listItem);
@@ -46,6 +50,7 @@ function init() {
         const transaction = {
             id: generateUUID(),
             amount: amount,
+            whom: whomElement.value,
             date: new Date().toISOString()
         };
 
@@ -82,6 +87,11 @@ function init() {
     window.removeTransaction = removeTransaction; // Make the function global
 
     addTransactionBtn.addEventListener('click', addTransaction);
+    amountElement.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            addTransaction();
+        }
+    });
 
     function loadTransactions() {
         listElement.innerHTML = '';
