@@ -196,4 +196,31 @@ function init() {
     renderTransactions();
     renderArchivedTransactions();
     updateArchiveButtonState();
+
+
+    /**
+     * serviceWorker
+     */
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/service-worker.js').then(registration => {
+                console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            }, err => {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                // Notify user of the new update
+                let notification = document.createElement("div");
+                notification.setAttribute("style", "position: fixed; top: 10%; right: 10%; background-color: white; border: 1px solid black; padding: 1rem; z-index: 1000;");
+
+                notification.innerHTML = `
+        <p>New update available!</p>
+        <button onclick="window.location.reload()">Update</button>
+      `;
+
+                document.body.appendChild(notification);
+            });
+        });
+    }
 }
