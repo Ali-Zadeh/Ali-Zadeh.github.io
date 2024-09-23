@@ -25,7 +25,7 @@ function init() {
             <div class="d-flex justify-content-between align-items-center gap-3">
                 <div class="d-flex justify-content-between align-items-center gap-3 w-100"> 
                     <p class="m-0 fw-bolder" style="font-size: 0.9rem;">R${absAmount}</p> 
-                    <p class="m-0" style="font-size: 0.7rem;">${transaction.whom}, ${date}</p>
+                    <p class="m-0 text-secondary" style="font-size: 0.6rem;">${transaction.whom}, ${date}</p>
                 </div>
                 <button class="btn btn-danger btn-sm px-2 py-0" onclick="removeTransaction('${transaction.id}')">-</button>
             </div>
@@ -62,7 +62,7 @@ function init() {
         loadTransactions();
 
         amountElement.value = '';
-        amountElement.blur();
+        alert(`amount of ${transaction.amount} was added successfully.`);
     }
 
     function generateUUID() {
