@@ -62,6 +62,7 @@ function init() {
         loadTransactions();
 
         amountElement.value = '';
+        amountElement.blur();
     }
 
     function generateUUID() {
