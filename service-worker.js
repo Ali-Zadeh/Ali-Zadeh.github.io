@@ -1,4 +1,5 @@
-const CACHE_NAME = `my-app-cache-${new Date().toISOString()}`;
+const CACHE_VERSION = 'v11';
+const CACHE_NAME = `my-app-cache-${CACHE_VERSION}`;
 
 const urlsToCache = [
     '/',
