@@ -6,16 +6,23 @@ function init() {
     const amountElement = document.getElementById('amount');
     const whomElement = document.getElementById('whom');
     const addTransactionBtn = document.getElementById('addTransactionBtn');
+    const archiveListBtn = document.getElementById('ArchiveListBtn');
+    const archivedTotalElement = document.getElementById('archivedTotal');
+    const archivedListElement = document.getElementById('archivedList');
 
     let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+    let archivedTransactions = JSON.parse(localStorage.getItem('archivedTransactions')) || [];
+
+    const currencyFormatter = new Intl.NumberFormat('en-ZA', {style: 'currency', currency: 'ZAR'});
 
     function updateLocalStorage() {
         localStorage.setItem('transactions', JSON.stringify(transactions));
+        localStorage.setItem('archivedTransactions', JSON.stringify(archivedTransactions));
     }
 
-    function addTransactionDOM(transaction) {
+    function addTransactionDOM(transaction, listElement, isArchive = false) {
         const listItem = document.createElement('li');
-        const absAmount = Math.abs(transaction.amount).toFixed(2);
+        const formattedAmount = currencyFormatter.format(Math.abs(transaction.amount));
 
         listItem.classList.add('list-group-item');
 
@@ -24,10 +31,10 @@ function init() {
         listItem.innerHTML = `
             <div class="d-flex justify-content-between align-items-center gap-3">
                 <div class="d-flex justify-content-between align-items-center gap-3 w-100"> 
-                    <p class="m-0 fw-bolder" style="font-size: 0.9rem;">R${absAmount}</p> 
+                    <p class="m-0 fw-bolder" style="font-size: 0.9rem;">${formattedAmount}</p> 
                     <p class="m-0 text-secondary" style="font-size: 0.6rem;">${transaction.whom}, ${date}</p>
                 </div>
-                <button class="btn btn-danger btn-sm px-2 py-0" onclick="removeTransaction('${transaction.id}')">-</button>
+                ${!isArchive ? '<button class="btn btn-danger btn-sm px-2 py-0" onclick="removeTransaction(\'' + transaction.id + '\')">-</button>' : ''}
             </div>
         `;
 
@@ -36,7 +43,12 @@ function init() {
 
     function updateBalance() {
         const balance = transactions.reduce((acc, transaction) => acc + transaction.amount, 0);
-        balanceElement.innerText = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(balance);
+        balanceElement.innerText = currencyFormatter.format(balance);
+    }
+
+    function updateArchivedTotal() {
+        const total = archivedTransactions.reduce((acc, transaction) => acc + transaction.amount, 0);
+        archivedTotalElement.innerText = currencyFormatter.format(total);
     }
 
     function addTransaction() {
@@ -56,19 +68,20 @@ function init() {
 
         transactions.push(transaction);
         transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-        addTransactionDOM(transaction);
+        addTransactionDOM(transaction, listElement);
         updateBalance();
         updateLocalStorage();
         loadTransactions();
+        updateArchiveButtonState();
 
         amountElement.value = '';
-        alert(`amount of ${transaction.amount} was added successfully.`);
+        alert(`Amount of ${currencyFormatter.format(amount)} was added successfully.`);
     }
 
     function generateUUID() {
         var d = new Date().getTime();
         var d2 = ((typeof performance !== 'undefined') && performance.now && (performance.now() * 1000)) || 0;
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
             var r = Math.random() * 16;
             if (d > 0) {
                 r = (d + r) % 16 | 0;
@@ -85,23 +98,51 @@ function init() {
         transactions = transactions.filter(transaction => transaction.id !== id);
         updateLocalStorage();
         loadTransactions();
+        updateArchiveButtonState();
     }
 
-    window.removeTransaction = removeTransaction; // Make the function global
+    function archiveTransactions() {
+        archivedTransactions = archivedTransactions.concat(transactions.map(transaction => ({
+            ...transaction,
+            archivedAt: new Date().toISOString()
+        })));
+        transactions = [];
+        updateLocalStorage();
+        loadTransactions();
+        loadArchivedTransactions();
+        updateArchiveButtonState();
+    }
+
+    function loadTransactions() {
+        listElement.innerHTML = '';
+        transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+        transactions.forEach(transaction => addTransactionDOM(transaction, listElement));
+        updateBalance();
+    }
+
+    function loadArchivedTransactions() {
+        archivedListElement.innerHTML = '';
+        archivedTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+        archivedTransactions.forEach(transaction => addTransactionDOM(transaction, archivedListElement, true));
+        updateArchivedTotal();
+    }
+
+    function updateArchiveButtonState() {
+        archiveListBtn.disabled = transactions.length === 0;
+    }
+
+    window.removeTransaction = removeTransaction;
 
     addTransactionBtn.addEventListener('click', addTransaction);
+    archiveListBtn.addEventListener('click', archiveTransactions);
+
     amountElement.addEventListener('keypress', (event) => {
         if (event.key === 'Enter') {
             addTransaction();
         }
     });
 
-    function loadTransactions() {
-        listElement.innerHTML = '';
-        transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-        transactions.forEach(addTransactionDOM);
-        updateBalance();
-    }
-
     loadTransactions();
+    loadArchivedTransactions();
+    updateArchiveButtonState();
 }
