@@ -12,6 +12,7 @@ function init() {
         ARCHIVED_TOTAL: 'archivedTotal',
         ARCHIVED_LIST: 'archivedList',
         RESET_ALL: 'ResetEverythingBtn',
+        APP_HEADER: 'app-header'
     };
 
     // DOM Elements
@@ -24,6 +25,15 @@ function init() {
     const archivedTotalElement = document.getElementById(ELEMENT_IDS.ARCHIVED_TOTAL);
     const archivedListElement = document.getElementById(ELEMENT_IDS.ARCHIVED_LIST);
     const resetEverythingBtn = document.getElementById(ELEMENT_IDS.RESET_ALL);
+    const appHeaderElement = document.getElementById(ELEMENT_IDS.APP_HEADER);
+
+    appHeaderElement.addEventListener('input', (event) => {
+        const newValue = event.target.textContent;
+        setLocalStorageItem('appHeader', newValue);
+    });
+    // Load saved app header
+    const savedAppHeader = getLocalStorageItem('appHeader', 'Expense Tracker');
+    appHeaderElement.textContent = savedAppHeader;
 
     // Transactions Data
     let transactions = getLocalStorageItem('transactions', []);
