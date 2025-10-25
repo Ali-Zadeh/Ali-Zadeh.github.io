@@ -1,223 +1,241 @@
 document.addEventListener('DOMContentLoaded', init);
 
 function init() {
-    // Constants for DOM element IDs
-    const ELEMENT_IDS = {
-        BALANCE: 'balance',
-        LIST: 'list',
-        AMOUNT: 'amount',
-        WHOM: 'whom',
-        ADD_TRANSACTION: 'addTransactionBtn',
-        ARCHIVE_LIST: 'ArchiveListBtn',
-        ARCHIVED_TOTAL: 'archivedTotal',
-        ARCHIVED_LIST: 'archivedList',
-        RESET_ALL: 'ResetEverythingBtn',
-        APP_HEADER: 'app-header'
-    };
+  const ELEMENT_IDS = {
+    BALANCE: 'balance',
+    LIST: 'list',
+    AMOUNT: 'amount',
+    WHOM: 'whom',
+    ADD_TRANSACTION: 'addTransactionBtn',
+    ARCHIVE_LIST: 'ArchiveListBtn',
+    ARCHIVED_TOTAL: 'archivedTotal',
+    ARCHIVED_LIST: 'archivedList',
+    RESET_ALL: 'ResetEverythingBtn',
+    APP_HEADER: 'app-header',
+    WHOM_DATALIST: 'whom-list'
+  };
 
-    // DOM Elements
-    const balanceElement = document.getElementById(ELEMENT_IDS.BALANCE);
-    const listElement = document.getElementById(ELEMENT_IDS.LIST);
-    const amountElement = document.getElementById(ELEMENT_IDS.AMOUNT);
-    const whomElement = document.getElementById(ELEMENT_IDS.WHOM);
-    const addTransactionBtn = document.getElementById(ELEMENT_IDS.ADD_TRANSACTION);
-    const archiveListBtn = document.getElementById(ELEMENT_IDS.ARCHIVE_LIST);
-    const archivedTotalElement = document.getElementById(ELEMENT_IDS.ARCHIVED_TOTAL);
-    const archivedListElement = document.getElementById(ELEMENT_IDS.ARCHIVED_LIST);
-    const resetEverythingBtn = document.getElementById(ELEMENT_IDS.RESET_ALL);
-    const appHeaderElement = document.getElementById(ELEMENT_IDS.APP_HEADER);
+  // elements
+  const balanceElement = document.getElementById(ELEMENT_IDS.BALANCE);
+  const listElement = document.getElementById(ELEMENT_IDS.LIST);
+  const amountElement = document.getElementById(ELEMENT_IDS.AMOUNT);
+  const whomElement = document.getElementById(ELEMENT_IDS.WHOM);
+  const whomDatalist = document.getElementById(ELEMENT_IDS.WHOM_DATALIST);
+  const addTransactionBtn = document.getElementById(ELEMENT_IDS.ADD_TRANSACTION);
+  const archiveListBtn = document.getElementById(ELEMENT_IDS.ARCHIVE_LIST);
+  const archivedTotalElement = document.getElementById(ELEMENT_IDS.ARCHIVED_TOTAL);
+  const archivedListElement = document.getElementById(ELEMENT_IDS.ARCHIVED_LIST);
+  const resetEverythingBtn = document.getElementById(ELEMENT_IDS.RESET_ALL);
+  const appHeaderElement = document.getElementById(ELEMENT_IDS.APP_HEADER);
 
-    appHeaderElement.addEventListener('input', (event) => {
-        const newValue = event.target.textContent;
-        setLocalStorageItem('appHeader', newValue);
+  // storage keys
+  const STORAGE = {
+    TRANSACTIONS: 'transactions',
+    ARCHIVED: 'archivedTransactions',
+    APP_HEADER: 'appHeader',
+    WHOM_LIST: 'whomList'
+  };
+
+  // safe localStorage helpers
+  function getLocalStorageItem(key, defaultValue) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw === null) return defaultValue;
+      return JSON.parse(raw);
+    } catch (e) {
+      console.warn('Failed to parse localStorage key', key, e);
+      return defaultValue;
+    }
+  }
+  function setLocalStorageItem(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  // basic utilities
+  function generateUUID() {
+    let d = Date.now();
+    let d2 = (performance && performance.now && performance.now() * 1000) || 0;
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      let r = Math.random() * 16;
+      if (d > 0) {
+        r = (d + r) % 16 | 0;
+        d = Math.floor(d / 16);
+      } else {
+        r = (d2 + r) % 16 | 0;
+        d2 = Math.floor(d2 / 16);
+      }
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
     });
-    // Load saved app header
-    const savedAppHeader = getLocalStorageItem('appHeader', 'Expense Tracker');
-    appHeaderElement.textContent = savedAppHeader;
+  }
 
-    // Transactions Data
-    let transactions = getLocalStorageItem('transactions', []);
-    let archivedTransactions = getLocalStorageItem('archivedTransactions', []);
+  const currencyFormatter = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' });
+  function formatCurrency(v) { return currencyFormatter.format(v); }
+  function getTotalBalance(arr) { return arr.reduce((s, t) => s + (t.amount || 0), 0); }
+  function clearEl(el) { if (el) el.innerHTML = ''; }
+  function setText(el, txt) { if (el) el.innerText = txt; }
 
-    // Formatter
-    const currencyFormatter = new Intl.NumberFormat('en-ZA', {
-        style: 'currency',
-        currency: 'ZAR'
+  // data
+  let transactions = getLocalStorageItem(STORAGE.TRANSACTIONS, []);
+  let archivedTransactions = getLocalStorageItem(STORAGE.ARCHIVED, []);
+
+  // APP HEADER: make editable if exists and persist
+  if (appHeaderElement) {
+    appHeaderElement.contentEditable = 'true';
+    const savedHeader = getLocalStorageItem(STORAGE.APP_HEADER, 'Expense Tracker');
+    appHeaderElement.textContent = savedHeader;
+    appHeaderElement.addEventListener('input', (e) => {
+      setLocalStorageItem(STORAGE.APP_HEADER, e.target.textContent.trim());
     });
+  }
 
-    /**
-     * Utility Functions
-     */
-
-    function getLocalStorageItem(key, defaultValue) {
-        return JSON.parse(localStorage.getItem(key)) || defaultValue;
-    }
-
-    function setLocalStorageItem(key, value) {
-        localStorage.setItem(key, JSON.stringify(value));
-    }
-
-    function generateUUID() {
-        let d = new Date().getTime();
-        let d2 = ((typeof performance !== 'undefined') && performance.now && (performance.now() * 1000)) || 0;
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-            let r = Math.random() * 16;
-            if (d > 0) {
-                r = (d + r) % 16 | 0;
-                d = Math.floor(d / 16);
-            } else {
-                r = (d2 + r) % 16 | 0;
-                d2 = Math.floor(d2 / 16);
-            }
-            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-        });
-    }
-
-    function formatCurrency(amount) {
-        return currencyFormatter.format(amount);
-    }
-
-    function sortTransactionsByDate(transactions) {
-        return transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-    }
-
-    /**
-     * UI Update Functions
-     */
-
-    function updateDOMElementText(element, text) {
-        element.innerText = text;
-    }
-
-    function clearDOMElementContent(element) {
-        element.innerHTML = '';
-    }
-
-    function appendTransactionToDOM(transaction, listElement, isArchive = false) {
-        const listItem = document.createElement('li');
-        const formattedAmount = formatCurrency(Math.abs(transaction.amount));
-        const date = new Date(transaction.date).toLocaleString();
-
-        listItem.classList.add('list-group-item');
-        listItem.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center gap-3">
-                <div class="d-flex justify-content-between align-items-center gap-3 w-100">
-                    <p class="m-0 fw-bolder" style="font-size: 0.9rem;">${formattedAmount}</p>
-                    <p class="m-0 text-secondary" style="font-size: 0.6rem;">${transaction.whom}, ${date}</p>
-                </div>
-                ${!isArchive ? `<button class="btn btn-danger btn-sm px-2 py-0" onclick="removeTransaction('${transaction.id}')">-</button>` : ''}
-            </div>
-        `;
-
-        listElement.append(listItem);
-    }
-
-    function renderTransactions() {
-        clearDOMElementContent(listElement);
-        sortTransactionsByDate(transactions).forEach(transaction => appendTransactionToDOM(transaction, listElement));
-        updateDOMElementText(balanceElement, formatCurrency(getTotalBalance(transactions)));
-    }
-
-    function renderArchivedTransactions() {
-        clearDOMElementContent(archivedListElement);
-        sortTransactionsByDate(archivedTransactions).forEach(transaction => appendTransactionToDOM(transaction, archivedListElement, true));
-        updateDOMElementText(archivedTotalElement, formatCurrency(getTotalBalance(archivedTransactions)));
-    }
-
-    /**
-     * Business Logic Functions
-     */
-
-    function getTotalBalance(transactions) {
-        return transactions.reduce((acc, transaction) => acc + transaction.amount, 0);
-    }
-
-    function addTransaction() {
-        const amount = parseFloat(amountElement.value);
-        if (isNaN(amount) || amount === 0) {
-            alert('Please enter a valid amount');
-            return;
-        }
-
-        const transaction = {
-            id: generateUUID(),
-            amount: amount,
-            whom: whomElement.value,
-            date: new Date().toISOString()
-        };
-
-        transactions.push(transaction);
-        setLocalStorageItem('transactions', transactions);
-        renderTransactions();
-        updateArchiveButtonState();
-        amountElement.value = '';
-        alert(`Amount of ${formatCurrency(amount)} was added successfully.`);
-    }
-
-    function removeTransaction(id) {
-        transactions = transactions.filter(transaction => transaction.id !== id);
-        setLocalStorageItem('transactions', transactions);
-        renderTransactions();
-        updateArchiveButtonState();
-    }
-
-    function archiveTransactions() {
-        archivedTransactions = archivedTransactions.concat(transactions.map(transaction => ({
-            ...transaction,
-            archivedAt: new Date().toISOString()
-        })));
-        transactions = [];
-        setLocalStorageItem('transactions', transactions);
-        setLocalStorageItem('archivedTransactions', archivedTransactions);
-        renderTransactions();
-        renderArchivedTransactions();
-        updateArchiveButtonState();
-    }
-
-    function resetEverything() {
-        if (confirm('Are you sure you want to reset everything?')) {
-            localStorage.clear();
-            transactions = [];
-            archivedTransactions = [];
-            renderTransactions();
-            renderArchivedTransactions();
-            updateArchiveButtonState();
-        }
-    }
-
-    function updateArchiveButtonState() {
-        archiveListBtn.disabled = transactions.length === 0;
-    }
-
-    // Expose removeTransaction to the window object
-    window.removeTransaction = removeTransaction;
-
-    // Event Listeners
-    addTransactionBtn.addEventListener('click', addTransaction);
-    archiveListBtn.addEventListener('click', archiveTransactions);
-    resetEverythingBtn.addEventListener('click', resetEverything);
-    amountElement.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter') {
-            addTransaction();
-        }
+  // WHOM datalist persistence
+  function loadWhomList() {
+    const items = getLocalStorageItem(STORAGE.WHOM_LIST, []);
+    if (!whomDatalist) return;
+    clearEl(whomDatalist);
+    items.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      whomDatalist.appendChild(opt);
     });
+  }
+  function saveWhomIfNew(name) {
+    if (!name) return;
+    const clean = name.trim();
+    if (!clean) return;
+    const items = getLocalStorageItem(STORAGE.WHOM_LIST, []);
+    if (!items.includes(clean)) {
+      items.push(clean);
+      setLocalStorageItem(STORAGE.WHOM_LIST, items);
+      loadWhomList();
+    }
+  }
+  if (whomElement) {
+    // save on blur or change (covers typing + selecting)
+    whomElement.addEventListener('change', () => saveWhomIfNew(whomElement.value));
+    whomElement.addEventListener('blur', () => saveWhomIfNew(whomElement.value));
+  }
+  loadWhomList();
 
-    // Initial Rendering of Transactions
+  // DOM append using proper event listeners (no inline onclick)
+  function appendTransactionToDOM(transaction, targetEl, isArchive = false) {
+    if (!targetEl) return;
+    const li = document.createElement('li');
+    li.className = 'list-group-item';
+    const formattedAmount = formatCurrency(Math.abs(transaction.amount));
+    const date = new Date(transaction.date).toLocaleString();
+    const wrapper = document.createElement('div');
+    wrapper.className = 'd-flex justify-content-between align-items-center gap-3';
+
+    const left = document.createElement('div');
+    left.className = 'd-flex justify-content-between align-items-center gap-3 w-100';
+    const amtP = document.createElement('p'); amtP.className = 'm-0 fw-bolder'; amtP.style.fontSize = '0.9rem'; amtP.innerText = formattedAmount;
+    const whomP = document.createElement('p'); whomP.className = 'm-0 text-secondary'; whomP.style.fontSize = '0.6rem'; whomP.innerText = `${transaction.whom || ''}, ${date}`;
+    left.appendChild(amtP); left.appendChild(whomP);
+
+    wrapper.appendChild(left);
+
+    if (!isArchive) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-danger btn-sm px-2 py-0';
+      btn.type = 'button';
+      btn.innerText = '-';
+      btn.addEventListener('click', () => removeTransaction(transaction.id));
+      wrapper.appendChild(btn);
+    }
+
+    li.appendChild(wrapper);
+    targetEl.appendChild(li);
+  }
+
+  function renderTransactions() {
+    clearEl(listElement);
+    // non-mutating sort copy
+    [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date))
+      .forEach(t => appendTransactionToDOM(t, listElement));
+    setText(balanceElement, formatCurrency(getTotalBalance(transactions)));
+  }
+
+  function renderArchivedTransactions() {
+    clearEl(archivedListElement);
+    [...archivedTransactions].sort((a, b) => new Date(b.date) - new Date(a.date))
+      .forEach(t => appendTransactionToDOM(t, archivedListElement, true));
+    setText(archivedTotalElement, formatCurrency(getTotalBalance(archivedTransactions)));
+  }
+
+  function updateArchiveButtonState() {
+    if (archiveListBtn) archiveListBtn.disabled = transactions.length === 0;
+  }
+
+  // business logic
+  function addTransaction() {
+    if (!amountElement) return;
+    const amount = parseFloat(amountElement.value);
+    if (isNaN(amount) || amount === 0) { alert('Please enter a valid amount'); return; }
+    if (whomElement && !whomElement.value.trim()) { alert('Please enter whom to pay'); whomElement.focus(); return; }
+
+    const transaction = { id: generateUUID(), amount: amount, whom: whomElement ? whomElement.value.trim() : '', date: new Date().toISOString() };
+    transactions.push(transaction);
+    setLocalStorageItem(STORAGE.TRANSACTIONS, transactions);
+    saveWhomIfNew(transaction.whom); // persist whom
+    renderTransactions();
+    updateArchiveButtonState();
+    amountElement.value = '';
+    alert(`Amount of ${formatCurrency(amount)} was added successfully.`);
+  }
+
+  function removeTransaction(id) {
+    transactions = transactions.filter(t => t.id !== id);
+    setLocalStorageItem(STORAGE.TRANSACTIONS, transactions);
+    renderTransactions();
+    updateArchiveButtonState();
+  }
+
+  function archiveTransactions() {
+    if (transactions.length === 0) return;
+    archivedTransactions = archivedTransactions.concat(transactions.map(t => ({ ...t, archivedAt: new Date().toISOString() })));
+    transactions = [];
+    setLocalStorageItem(STORAGE.TRANSACTIONS, transactions);
+    setLocalStorageItem(STORAGE.ARCHIVED, archivedTransactions);
     renderTransactions();
     renderArchivedTransactions();
     updateArchiveButtonState();
+  }
 
+  function resetEverything() {
+    if (!confirm('Are you sure you want to reset everything?')) return;
+    localStorage.clear();
+    transactions = [];
+    archivedTransactions = [];
+    loadWhomList();
+    if (appHeaderElement) appHeaderElement.textContent = 'Expense Tracker';
+    renderTransactions();
+    renderArchivedTransactions();
+    updateArchiveButtonState();
+  }
 
-    /**
-     * serviceWorker
-     */
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/service-worker.js').then(registration => {
-                console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            }, err => {
-                console.log('ServiceWorker registration failed: ', err);
-            });
-        });
-    }
+  // expose for debug if needed
+  window.removeTransaction = removeTransaction;
+
+  // listeners
+  if (addTransactionBtn) addTransactionBtn.addEventListener('click', addTransaction);
+  if (archiveListBtn) archiveListBtn.addEventListener('click', archiveTransactions);
+  if (resetEverythingBtn) resetEverythingBtn.addEventListener('click', resetEverything);
+  if (amountElement) {
+    amountElement.addEventListener('keydown', (e) => { if (e.key === 'Enter') addTransaction(); });
+  }
+
+  // initial render
+  renderTransactions();
+  renderArchivedTransactions();
+  updateArchiveButtonState();
+
+  // service worker (unchanged)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(reg => console.log('ServiceWorker registered with scope:', reg.scope))
+        .catch(err => console.log('ServiceWorker registration failed:', err));
+    });
+  }
 }
