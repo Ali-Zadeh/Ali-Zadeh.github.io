@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v12';
+const CACHE_VERSION = 'v13';
 const CACHE_NAME = `my-app-cache-${CACHE_VERSION}`;
 
 const urlsToCache = [
@@ -6,6 +6,8 @@ const urlsToCache = [
     '/index.html',
     '/index.js',
     '/bootstrap.min.css',
+    '/bootstrap.bundle.min.js',
+    '/chart.umd.min.js',
     '/icon-512x512.png',
     '/manifest.json'
 ];

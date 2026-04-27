@@ -4,65 +4,249 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Corner Cafe </title>
+    <title>IOUs</title>
     <link href="bootstrap.min.css" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <base href="/">
     <style>
+        :root {
+            --bg: #f6f7fb;
+            --card: #ffffff;
+            --text: #0b1220;
+            --muted: #495057;
+            --accent: #0d6efd;
+            --success: #198754;
+            --danger: #dc3545;
+            --surface-contrast: rgba(11, 18, 32, 0.06);
+        }
+
         * {
-            font-family: monospace;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, monospace
         }
 
         body {
-            background: #999999;
-            color: black;
+            background: var(--bg);
+            color: var(--text);
         }
 
-        @media (prefers-color-scheme: dark) {
-            body {
-                background: #444444;
-                color: white;
+        @media (prefers-color-scheme:dark) {
+            :root {
+                --bg: #071325;
+                --card: #071b2b;
+                --text: #e6eef8;
+                --muted: #9fb2c8;
+                --accent: #66b2ff;
+                --success: #57d58a;
+                --danger: #ff6b6b;
+                --surface-contrast: rgba(230, 238, 248, 0.04);
             }
+
+            body {
+                background: var(--bg);
+                color: var(--text);
+            }
+        }
+
+        .money-plus {
+            color: var(--success)
+        }
+
+        .money-minus {
+            color: var(--danger)
+        }
+
+        .small-muted {
+            font-size: .9rem;
+            color: var(--muted);
+        }
+
+        .app-header[contenteditable] {
+            outline: none
+        }
+
+        .cursor-pointer {
+            cursor: pointer
+        }
+
+        .amount-input {
+            max-width: 220px
+        }
+
+        .card,
+        .list-group-item,
+        .modal-content {
+            background: var(--card);
+            color: var(--text);
+            border: 1px solid var(--surface-contrast);
+        }
+
+        .small-muted,
+        .list-group-item .small-muted {
+            font-size: 0.92rem;
+            line-height: 1.25;
+        }
+
+        .btn-outline-secondary,
+        .btn-outline-success,
+        .btn-outline-warning {
+            color: var(--text);
+            border-color: var(--surface-contrast);
+            background: transparent;
+        }
+
+        table.table thead th {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        table.table td {
+            vertical-align: middle;
+            color: var(--text);
+        }
+
+        input:focus,
+        button:focus,
+        select:focus {
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.12);
+            outline: none
+        }
+
+        @media (max-width:576px) {
+            .amount-input {
+                max-width: 160px
+            }
+        }
+
+        /* editable person name styles */
+        .person-name[contenteditable] {
+            padding: 2px 4px;
+            border-radius: 4px
+        }
+
+        .person-name:focus {
+            outline: 2px solid rgba(13, 110, 253, 0.12);
         }
     </style>
 </head>
 
 <body>
-    <div class="container p-3 d-flex flex-column justify-content-start align-items-center gap-5"
-        style="min-height: 100dvh;">
-        <h1 id="app-header" class="fw-bolder" style="font-size: 2.7rem;" contenteditable="true">Expense Tracker</h1>
+    <div class="container py-4">
+        <div class="row justify-content-center">
+            <div class="col-xl-8 col-lg-9 col-md-10">
 
-        <div class="d-flex flex-column justify-content-center align-items-start w-100 gap-3">
-            <h3 id="balance" class="fw-bolder">R0.00</h3>
+                <h1 id="appHeader" class="h3 fw-bold app-header mb-3" contenteditable="true" title="Click to rename">
+                    Corner Café — IOUs</h1>
 
-            <div class="d-flex justify-content-center align-items-center w-100">
-                <label for="whom" style="width: 100px;">Whom:</label>
-                <input list="whom-list" id="whom" name="whom" class="form-control"/>
-                <datalist id="whom-list"></datalist>
-            </div>
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-body d-flex flex-column gap-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="small-muted">Total Owed</div>
+                                <div id="balance" class="h4 fw-bold">R0.00</div>
+                            </div>
 
-            <div class="d-flex justify-content-center align-items-center w-100 gap-3">
-                <label for="amount" class="d-none"></label>
-                <input type="number" inputmode="numeric" id="amount" class="form-control" placeholder="Amount"
-                    autofocus />
-                <button id="addTransactionBtn" class="btn btn-primary">Add</button>
+                            <div class="text-end">
+                                <div class="d-flex align-items-center gap-2">
+                                    <input id="amount" type="number" step="0.01" min="0"
+                                        class="form-control form-control-sm amount-input" placeholder="Amount"
+                                        aria-label="Amount">
+                                    <button id="addBtn" class="btn btn-primary btn-sm">Add</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="mb-2">Outstanding</h6>
+
+                        <ul id="peopleList" class="list-group" style="max-height: 320px; overflow-y: auto;"></ul>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body">
+                        <h6>Insights</h6>
+                        <canvas id="chart" height="120"></canvas>
+                        <div class="mt-2 small-muted">Daily totals (last 30 days).</div>
+                    </div>
+                </div>
+
+                <div class="card mb-4 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="mb-2">Archived (paid)</h6>
+                        <ul id="archivedList" class="list-group"
+                            style="max-height: 240px; overflow-y: auto;"></ul>
+                    </div>
+                </div>
+
+                <div class="text-center mt-5 mb-3 d-flex flex-column gap-1 align-items-center">
+                    <button id="archiveAllBtn" type="button" class="btn btn-link btn-sm"
+                        style="text-decoration: none; opacity: 0.65;">Mark all as paid…</button>
+                    <button id="resetBtn" type="button" class="btn btn-link btn-sm text-danger"
+                        style="text-decoration: none; opacity: 0.65;">Reset all data…</button>
+                </div>
+
             </div>
         </div>
-
-        <div class="w-100">
-            <div class="d-flex justify-content-between align-items-end mb-3">
-                <h6 class="m-0">History</h6>
-                <button id="ArchiveListBtn" class="btn btn-warning btn-sm m-0">Archive</button>
-            </div>
-            <ul id="list" class="list-group"></ul>
-            <hr>
-            <h6 class="my-3">Archived <span id="archivedTotal">R0.00</span></h6>
-            <ul id="archivedList" class="list-group"></ul>
-        </div>
-
-        <button id="ResetEverythingBtn" class="btn btn-danger btn-sm">Reset Everything</button>
     </div>
 
+    <!-- Pay-all confirmation modal (type-to-confirm) -->
+    <div class="modal fade" id="archiveConfirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Mark all as paid?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">This moves <strong>all</strong> outstanding entries to the archived (paid) list.
+                    </p>
+                    <p class="small-muted mb-2">Type <strong>PAY ALL</strong> below to confirm.</p>
+                    <input id="archiveConfirmInput" type="text" class="form-control" autocomplete="off"
+                        placeholder="PAY ALL">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button id="archiveConfirmBtn" type="button" class="btn btn-success" disabled>Mark all
+                        paid</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset confirmation modal (type-to-confirm) -->
+    <div class="modal fade" id="resetConfirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Reset all data?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">This permanently deletes <strong>all</strong> outstanding entries, archived (paid)
+                        entries, and saved names from this browser. This cannot be undone.</p>
+                    <p class="small-muted mb-2">Type <strong>RESET</strong> below to confirm.</p>
+                    <input id="resetConfirmInput" type="text" class="form-control" autocomplete="off"
+                        placeholder="RESET">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button id="resetConfirmBtn" type="button" class="btn btn-danger" disabled>Delete
+                        everything</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toasts -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080">
+        <div id="toastContainer"></div>
+    </div>
+
+    <script src="bootstrap.bundle.min.js"></script>
+    <script src="chart.umd.min.js"></script>
     <script src="index.js"></script>
 </body>
 

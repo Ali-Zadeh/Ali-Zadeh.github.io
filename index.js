@@ -1,241 +1,161 @@
 document.addEventListener('DOMContentLoaded', init);
 
 function init() {
-  const ELEMENT_IDS = {
-    BALANCE: 'balance',
-    LIST: 'list',
-    AMOUNT: 'amount',
-    WHOM: 'whom',
-    ADD_TRANSACTION: 'addTransactionBtn',
-    ARCHIVE_LIST: 'ArchiveListBtn',
-    ARCHIVED_TOTAL: 'archivedTotal',
-    ARCHIVED_LIST: 'archivedList',
-    RESET_ALL: 'ResetEverythingBtn',
-    APP_HEADER: 'app-header',
-    WHOM_DATALIST: 'whom-list'
-  };
+    const STORAGE = { TX: 'iou_tx', ARCH: 'iou_arch', WHOM: 'iou_whom', APP: 'iou_app' };
+    const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' });
+    const $ = id => document.getElementById(id);
+    function load(k, def) { try { return JSON.parse(localStorage.getItem(k)) || def } catch (e) { return def } }
+    function save(k, v) { localStorage.setItem(k, JSON.stringify(v)) }
+    function uid() { return crypto.randomUUID ? crypto.randomUUID() : ('id-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9)) }
+    function toast(msg) { const c = $('toastContainer'); const el = document.createElement('div'); el.className = 'toast align-items-center text-bg-dark border-0 show mb-2'; el.role = 'alert'; el.ariaLive = 'assertive'; el.ariaAtomic = 'true'; el.innerHTML = `<div class="d-flex"><div class="toast-body">${msg}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`; c.appendChild(el); setTimeout(() => el.remove(), 2500) }
 
-  // elements
-  const balanceElement = document.getElementById(ELEMENT_IDS.BALANCE);
-  const listElement = document.getElementById(ELEMENT_IDS.LIST);
-  const amountElement = document.getElementById(ELEMENT_IDS.AMOUNT);
-  const whomElement = document.getElementById(ELEMENT_IDS.WHOM);
-  const whomDatalist = document.getElementById(ELEMENT_IDS.WHOM_DATALIST);
-  const addTransactionBtn = document.getElementById(ELEMENT_IDS.ADD_TRANSACTION);
-  const archiveListBtn = document.getElementById(ELEMENT_IDS.ARCHIVE_LIST);
-  const archivedTotalElement = document.getElementById(ELEMENT_IDS.ARCHIVED_TOTAL);
-  const archivedListElement = document.getElementById(ELEMENT_IDS.ARCHIVED_LIST);
-  const resetEverythingBtn = document.getElementById(ELEMENT_IDS.RESET_ALL);
-  const appHeaderElement = document.getElementById(ELEMENT_IDS.APP_HEADER);
+    // one-time migration: pre-namespaced keys → iou_* keys. Old values were JSON-stringified, same format as new ones.
+    (function migrateLegacyStorage() {
+        const moves = [['transactions', STORAGE.TX], ['archivedTransactions', STORAGE.ARCH], ['whomList', STORAGE.WHOM], ['appHeader', STORAGE.APP]];
+        for (const [oldKey, newKey] of moves) {
+            const oldVal = localStorage.getItem(oldKey);
+            if (oldVal === null) continue;
+            if (localStorage.getItem(newKey) === null) { localStorage.setItem(newKey, oldVal); localStorage.removeItem(oldKey); }
+        }
+    })();
 
-  // storage keys
-  const STORAGE = {
-    TRANSACTIONS: 'transactions',
-    ARCHIVED: 'archivedTransactions',
-    APP_HEADER: 'appHeader',
-    WHOM_LIST: 'whomList'
-  };
+    let transactions = load(STORAGE.TX, []); // {id, whom, amount, date}; whom kept in shape but not used (single-merchant app)
+    let archived = load(STORAGE.ARCH, []);
 
-  // safe localStorage helpers
-  function getLocalStorageItem(key, defaultValue) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw === null) return defaultValue;
-      return JSON.parse(raw);
-    } catch (e) {
-      console.warn('Failed to parse localStorage key', key, e);
-      return defaultValue;
-    }
-  }
-  function setLocalStorageItem(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
-  }
+    const peopleList = $('peopleList'), archList = $('archivedList'), balanceEl = $('balance');
+    const amountEl = $('amount'), addBtn = $('addBtn');
+    const archiveAllBtn = $('archiveAllBtn'), resetBtn = $('resetBtn');
+    const appHeader = $('appHeader');
+    const resetConfirmModalEl = $('resetConfirmModal'), resetConfirmInput = $('resetConfirmInput'), resetConfirmBtn = $('resetConfirmBtn');
+    const archiveConfirmModalEl = $('archiveConfirmModal'), archiveConfirmInput = $('archiveConfirmInput'), archiveConfirmBtn = $('archiveConfirmBtn');
 
-  // basic utilities
-  function generateUUID() {
-    let d = Date.now();
-    let d2 = (performance && performance.now && performance.now() * 1000) || 0;
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-      let r = Math.random() * 16;
-      if (d > 0) {
-        r = (d + r) % 16 | 0;
-        d = Math.floor(d / 16);
-      } else {
-        r = (d2 + r) % 16 | 0;
-        d2 = Math.floor(d2 / 16);
-      }
-      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-    });
-  }
+    appHeader.contentEditable = true;
+    appHeader.addEventListener('input', () => save(STORAGE.APP, appHeader.textContent.trim()));
+    appHeader.textContent = load(STORAGE.APP, 'Corner Café — IOUs');
 
-  const currencyFormatter = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' });
-  function formatCurrency(v) { return currencyFormatter.format(v); }
-  function getTotalBalance(arr) { return arr.reduce((s, t) => s + (t.amount || 0), 0); }
-  function clearEl(el) { if (el) el.innerHTML = ''; }
-  function setText(el, txt) { if (el) el.innerText = txt; }
+    function saveAll() { save(STORAGE.TX, transactions); save(STORAGE.ARCH, archived); }
+    function format(v) { return currency.format(v || 0); }
+    function sum(arr) { return arr.reduce((s, t) => s + (t.amount || 0), 0); }
 
-  // data
-  let transactions = getLocalStorageItem(STORAGE.TRANSACTIONS, []);
-  let archivedTransactions = getLocalStorageItem(STORAGE.ARCHIVED, []);
-
-  // APP HEADER: make editable if exists and persist
-  if (appHeaderElement) {
-    appHeaderElement.contentEditable = 'true';
-    const savedHeader = getLocalStorageItem(STORAGE.APP_HEADER, 'Expense Tracker');
-    appHeaderElement.textContent = savedHeader;
-    appHeaderElement.addEventListener('input', (e) => {
-      setLocalStorageItem(STORAGE.APP_HEADER, e.target.textContent.trim());
-    });
-  }
-
-  // WHOM datalist persistence
-  function loadWhomList() {
-    const items = getLocalStorageItem(STORAGE.WHOM_LIST, []);
-    if (!whomDatalist) return;
-    clearEl(whomDatalist);
-    items.forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      whomDatalist.appendChild(opt);
-    });
-  }
-  function saveWhomIfNew(name) {
-    if (!name) return;
-    const clean = name.trim();
-    if (!clean) return;
-    const items = getLocalStorageItem(STORAGE.WHOM_LIST, []);
-    if (!items.includes(clean)) {
-      items.push(clean);
-      setLocalStorageItem(STORAGE.WHOM_LIST, items);
-      loadWhomList();
-    }
-  }
-  if (whomElement) {
-    // save on blur or change (covers typing + selecting)
-    whomElement.addEventListener('change', () => saveWhomIfNew(whomElement.value));
-    whomElement.addEventListener('blur', () => saveWhomIfNew(whomElement.value));
-  }
-  loadWhomList();
-
-  // DOM append using proper event listeners (no inline onclick)
-  function appendTransactionToDOM(transaction, targetEl, isArchive = false) {
-    if (!targetEl) return;
-    const li = document.createElement('li');
-    li.className = 'list-group-item';
-    const formattedAmount = formatCurrency(Math.abs(transaction.amount));
-    const date = new Date(transaction.date).toLocaleString();
-    const wrapper = document.createElement('div');
-    wrapper.className = 'd-flex justify-content-between align-items-center gap-3';
-
-    const left = document.createElement('div');
-    left.className = 'd-flex justify-content-between align-items-center gap-3 w-100';
-    const amtP = document.createElement('p'); amtP.className = 'm-0 fw-bolder'; amtP.style.fontSize = '0.9rem'; amtP.innerText = formattedAmount;
-    const whomP = document.createElement('p'); whomP.className = 'm-0 text-secondary'; whomP.style.fontSize = '0.6rem'; whomP.innerText = `${transaction.whom || ''}, ${date}`;
-    left.appendChild(amtP); left.appendChild(whomP);
-
-    wrapper.appendChild(left);
-
-    if (!isArchive) {
-      const btn = document.createElement('button');
-      btn.className = 'btn btn-danger btn-sm px-2 py-0';
-      btn.type = 'button';
-      btn.innerText = '-';
-      btn.addEventListener('click', () => removeTransaction(transaction.id));
-      wrapper.appendChild(btn);
+    function renderOutstanding() {
+        peopleList.innerHTML = '';
+        if (transactions.length === 0) {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            li.textContent = 'No outstanding entries';
+            peopleList.appendChild(li);
+        } else {
+            const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+            for (const t of sorted) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                const date = document.createElement('div'); date.className = 'small-muted'; date.textContent = new Date(t.date).toLocaleString();
+                const amt = document.createElement('div'); amt.className = 'fw-bold'; amt.textContent = format(t.amount);
+                li.append(date, amt);
+                peopleList.appendChild(li);
+            }
+        }
+        balanceEl.textContent = format(sum(transactions));
     }
 
-    li.appendChild(wrapper);
-    targetEl.appendChild(li);
-  }
+    function renderArchived() {
+        archList.innerHTML = '';
+        if (archived.length === 0) {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            li.textContent = 'No archived payments';
+            archList.appendChild(li);
+            return;
+        }
+        const sorted = archived.slice().sort((a, b) => new Date(b.archivedAt || b.date) - new Date(a.archivedAt || a.date));
+        for (const t of sorted) {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+            li.innerHTML = `<div class="small-muted">Paid: ${new Date(t.archivedAt || t.date).toLocaleDateString()}</div><div>${format(t.amount)}</div>`;
+            archList.appendChild(li);
+        }
+    }
 
-  function renderTransactions() {
-    clearEl(listElement);
-    // non-mutating sort copy
-    [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date))
-      .forEach(t => appendTransactionToDOM(t, listElement));
-    setText(balanceElement, formatCurrency(getTotalBalance(transactions)));
-  }
+    function addTransaction() {
+        const raw = amountEl.value;
+        if (raw === null || raw === '') { toast('Enter a positive amount'); amountEl.focus(); return; }
+        const parsed = parseFloat(String(raw).replace(',', '.'));
+        if (isNaN(parsed) || parsed <= 0) { toast('Enter a positive amount'); amountEl.focus(); return; }
+        const tx = { id: uid(), whom: '', amount: Math.round(parsed * 100) / 100, date: new Date().toISOString() };
+        transactions.push(tx);
+        saveAll();
+        amountEl.value = '';
+        renderOutstanding(); renderArchived(); drawChart();
+        toast('Saved');
+    }
 
-  function renderArchivedTransactions() {
-    clearEl(archivedListElement);
-    [...archivedTransactions].sort((a, b) => new Date(b.date) - new Date(a.date))
-      .forEach(t => appendTransactionToDOM(t, archivedListElement, true));
-    setText(archivedTotalElement, formatCurrency(getTotalBalance(archivedTransactions)));
-  }
-
-  function updateArchiveButtonState() {
-    if (archiveListBtn) archiveListBtn.disabled = transactions.length === 0;
-  }
-
-  // business logic
-  function addTransaction() {
-    if (!amountElement) return;
-    const amount = parseFloat(amountElement.value);
-    if (isNaN(amount) || amount === 0) { alert('Please enter a valid amount'); return; }
-    if (whomElement && !whomElement.value.trim()) { alert('Please enter whom to pay'); whomElement.focus(); return; }
-
-    const transaction = { id: generateUUID(), amount: amount, whom: whomElement ? whomElement.value.trim() : '', date: new Date().toISOString() };
-    transactions.push(transaction);
-    setLocalStorageItem(STORAGE.TRANSACTIONS, transactions);
-    saveWhomIfNew(transaction.whom); // persist whom
-    renderTransactions();
-    updateArchiveButtonState();
-    amountElement.value = '';
-    alert(`Amount of ${formatCurrency(amount)} was added successfully.`);
-  }
-
-  function removeTransaction(id) {
-    transactions = transactions.filter(t => t.id !== id);
-    setLocalStorageItem(STORAGE.TRANSACTIONS, transactions);
-    renderTransactions();
-    updateArchiveButtonState();
-  }
-
-  function archiveTransactions() {
-    if (transactions.length === 0) return;
-    archivedTransactions = archivedTransactions.concat(transactions.map(t => ({ ...t, archivedAt: new Date().toISOString() })));
-    transactions = [];
-    setLocalStorageItem(STORAGE.TRANSACTIONS, transactions);
-    setLocalStorageItem(STORAGE.ARCHIVED, archivedTransactions);
-    renderTransactions();
-    renderArchivedTransactions();
-    updateArchiveButtonState();
-  }
-
-  function resetEverything() {
-    if (!confirm('Are you sure you want to reset everything?')) return;
-    localStorage.clear();
-    transactions = [];
-    archivedTransactions = [];
-    loadWhomList();
-    if (appHeaderElement) appHeaderElement.textContent = 'Expense Tracker';
-    renderTransactions();
-    renderArchivedTransactions();
-    updateArchiveButtonState();
-  }
-
-  // expose for debug if needed
-  window.removeTransaction = removeTransaction;
-
-  // listeners
-  if (addTransactionBtn) addTransactionBtn.addEventListener('click', addTransaction);
-  if (archiveListBtn) archiveListBtn.addEventListener('click', archiveTransactions);
-  if (resetEverythingBtn) resetEverythingBtn.addEventListener('click', resetEverything);
-  if (amountElement) {
-    amountElement.addEventListener('keydown', (e) => { if (e.key === 'Enter') addTransaction(); });
-  }
-
-  // initial render
-  renderTransactions();
-  renderArchivedTransactions();
-  updateArchiveButtonState();
-
-  // service worker (unchanged)
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/service-worker.js')
-        .then(reg => console.log('ServiceWorker registered with scope:', reg.scope))
-        .catch(err => console.log('ServiceWorker registration failed:', err));
+    archiveAllBtn.addEventListener('click', () => {
+        if (transactions.length === 0) return toast('Nothing to archive');
+        archiveConfirmInput.value = ''; archiveConfirmBtn.disabled = true;
+        bootstrap.Modal.getOrCreateInstance(archiveConfirmModalEl).show();
+        setTimeout(() => archiveConfirmInput.focus(), 200);
     });
-  }
+    archiveConfirmInput.addEventListener('input', () => { archiveConfirmBtn.disabled = archiveConfirmInput.value.trim() !== 'PAY ALL'; });
+    archiveConfirmInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !archiveConfirmBtn.disabled) archiveConfirmBtn.click(); });
+    archiveConfirmBtn.addEventListener('click', () => {
+        if (archiveConfirmInput.value.trim() !== 'PAY ALL') return;
+        archived = archived.concat(transactions.map(t => ({ ...t, archivedAt: new Date().toISOString() })));
+        transactions = [];
+        saveAll(); renderOutstanding(); renderArchived(); drawChart();
+        bootstrap.Modal.getOrCreateInstance(archiveConfirmModalEl).hide();
+        toast('All marked paid');
+    });
+
+    resetBtn.addEventListener('click', () => {
+        resetConfirmInput.value = ''; resetConfirmBtn.disabled = true;
+        bootstrap.Modal.getOrCreateInstance(resetConfirmModalEl).show();
+        setTimeout(() => resetConfirmInput.focus(), 200);
+    });
+    resetConfirmInput.addEventListener('input', () => { resetConfirmBtn.disabled = resetConfirmInput.value.trim() !== 'RESET'; });
+    resetConfirmInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !resetConfirmBtn.disabled) resetConfirmBtn.click(); });
+    resetConfirmBtn.addEventListener('click', () => {
+        if (resetConfirmInput.value.trim() !== 'RESET') return;
+        localStorage.clear(); transactions = []; archived = [];
+        saveAll(); renderOutstanding(); renderArchived(); drawChart();
+        bootstrap.Modal.getOrCreateInstance(resetConfirmModalEl).hide();
+        toast('Reset done');
+    });
+
+    addBtn.addEventListener('click', addTransaction);
+    amountEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') addTransaction(); });
+
+    // chart: last 30 days, daily totals
+    let chart = null;
+    function dayKey(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+    function drawChart() {
+        try {
+            const ctx = $('chart').getContext('2d');
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const days = [];
+            for (let i = 29; i >= 0; i--) {
+                const d = new Date(today); d.setDate(today.getDate() - i);
+                days.push({ label: `${d.getDate()}/${d.getMonth() + 1}`, key: dayKey(d) });
+            }
+            const all = transactions.concat(archived);
+            const totals = new Map(days.map(x => [x.key, 0]));
+            for (const t of all) { const k = dayKey(new Date(t.date)); if (totals.has(k)) totals.set(k, totals.get(k) + (t.amount || 0)); }
+            const values = days.map(x => totals.get(x.key));
+            const labels = days.map(x => x.label);
+            if (chart) chart.destroy();
+            chart = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: 'Total (paid+owed)', data: values }] }, options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { autoSkip: true, maxRotation: 0 } } } } });
+        } catch (e) { console.warn(e); }
+    }
+
+    renderOutstanding(); renderArchived(); drawChart();
+
+    window.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); amountEl.focus(); amountEl.select(); } });
+    amountEl.focus();
+
+    window.app = { transactions, archived };
+
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/service-worker.js').catch(err => console.warn('SW registration failed', err));
+        });
+    }
 }
