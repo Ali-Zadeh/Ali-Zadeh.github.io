@@ -37,6 +37,13 @@ function init() {
     function format(v) { return currency.format(v || 0); }
     function sum(arr) { return arr.reduce((s, t) => s + (t.amount || 0), 0); }
 
+    function makeDeleteBtn(onClick) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'btn-close'; b.setAttribute('aria-label', 'Delete');
+        b.addEventListener('click', onClick);
+        return b;
+    }
+
     function renderOutstanding() {
         peopleList.innerHTML = '';
         if (transactions.length === 0) {
@@ -50,8 +57,10 @@ function init() {
                 const li = document.createElement('li');
                 li.className = 'list-group-item d-flex justify-content-between align-items-center';
                 const date = document.createElement('div'); date.className = 'small-muted'; date.textContent = new Date(t.date).toLocaleString();
+                const right = document.createElement('div'); right.className = 'd-flex align-items-center gap-3';
                 const amt = document.createElement('div'); amt.className = 'fw-bold'; amt.textContent = format(t.amount);
-                li.append(date, amt);
+                right.append(amt, makeDeleteBtn(() => deleteOutstanding(t.id)));
+                li.append(date, right);
                 peopleList.appendChild(li);
             }
         }
@@ -74,6 +83,12 @@ function init() {
             li.innerHTML = `<div class="small-muted">Paid: ${new Date(t.archivedAt || t.date).toLocaleDateString()}</div><div>${format(t.amount)}</div>`;
             archList.appendChild(li);
         }
+    }
+
+    function deleteOutstanding(id) {
+        transactions = transactions.filter(t => t.id !== id);
+        saveAll(); renderOutstanding(); drawChart();
+        toast('Deleted');
     }
 
     function addTransaction() {
