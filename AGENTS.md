@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents when working with code in this repository.
 
 ## Project
 
@@ -8,16 +8,16 @@ Static single-page PWA ("Corner Café — IOUs") deployed via GitHub Pages from 
 
 ## Stack and tooling
 
-- Vanilla HTML/CSS/JS. No framework, no bundler, no `package.json`, no tests, no lint config.
+- Vanilla HTML/CSS/JS. No framework, no bundler, no `package.json`, no lint config.
 - Vendored libraries committed to the repo root: `bootstrap.min.css`, `bootstrap.bundle.min.js`, `chart.umd.min.js`. Do not add a CDN dependency or a build step without first confirming with the user — the site is intentionally self-contained so it works offline via the service worker.
 - To run locally, serve the directory with any static server (e.g. `python3 -m http.server`) and open `index.html`. Opening via `file://` will break the service worker and the `<base href="/">`.
+- Tests: `tests/logic.test.js`, run with `node --test tests/logic.test.js` (Node's built-in test runner, no dependency). Only `logic.js`'s pure functions are unit-tested; DOM wiring in `index.js` is verified manually.
 
 ## Architecture
 
-Everything lives in three files:
-
 - `index.html` — markup, inline CSS (theme variables + dark-mode media query), and the modal/toast containers. The `<h1 id="appHeader">` is `contenteditable` and persists to `localStorage`.
-- `index.js` — the entire app; one `init()` function attached to `DOMContentLoaded`. Uses module-private state (`transactions`, `archived`, `whomList`) plus DOM refs grabbed once at top of `init`. Re-renders are explicit calls to `renderPeople() / renderArchived() / drawChart()` after every mutation.
+- `logic.js` — pure, DOM-free helper functions (amount parsing/validation, the pay-all tap-twice-to-confirm state machine). UMD-wrapped so the same file loads via `<script>` in the browser and `require()` in tests.
+- `index.js` — the app; one `init()` function attached to `DOMContentLoaded`. Uses module-private state (`transactions`, `archived`, `whomList`) plus DOM refs grabbed once at top of `init`. Re-renders are explicit calls to `renderOutstanding() / renderArchived() / drawChart()` after every mutation. Delegates validation and the pay-all confirm state to `logic.js`.
 - `service-worker.js` — PWA cache, stale-while-revalidate-ish (cache-first with network fallback that re-populates cache).
 
 ### State model (localStorage keys)

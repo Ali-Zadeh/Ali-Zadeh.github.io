@@ -1,17 +1,30 @@
 document.addEventListener('DOMContentLoaded', init);
 
 function init() {
-    const STORAGE = { TX: 'iou_tx', ARCH: 'iou_arch', WHOM: 'iou_whom', APP: 'iou_app' };
+    const STORAGE = { TX: 'iou_tx', ARCH: 'iou_arch', WHOM: 'iou_whom' };
     const currency = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' });
     const $ = id => document.getElementById(id);
     function load(k, def) { try { return JSON.parse(localStorage.getItem(k)) || def } catch (e) { return def } }
     function save(k, v) { localStorage.setItem(k, JSON.stringify(v)) }
     function uid() { return crypto.randomUUID ? crypto.randomUUID() : ('id-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9)) }
     function toast(msg) { const c = $('toastContainer'); const el = document.createElement('div'); el.className = 'toast align-items-center text-bg-dark border-0 show mb-2'; el.role = 'alert'; el.ariaLive = 'assertive'; el.ariaAtomic = 'true'; el.innerHTML = `<div class="d-flex"><div class="toast-body">${msg}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`; c.appendChild(el); setTimeout(() => el.remove(), 2500) }
+    function toastWithUndo(msg, onUndo) {
+        const c = $('toastContainer'); const el = document.createElement('div');
+        el.className = 'toast align-items-center text-bg-dark border-0 show mb-2';
+        el.role = 'alert'; el.ariaLive = 'assertive'; el.ariaAtomic = 'true';
+        el.innerHTML = `<div class="d-flex"><div class="toast-body">${msg}</div><button type="button" class="btn btn-sm btn-link text-white text-decoration-underline me-1 my-auto">Undo</button><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+        c.appendChild(el);
+        let settled = false;
+        const timer = setTimeout(() => { if (!settled) { settled = true; el.remove(); } }, 4000);
+        el.querySelector('.btn-link').addEventListener('click', () => {
+            if (settled) return;
+            settled = true; clearTimeout(timer); el.remove(); onUndo();
+        });
+    }
 
     // one-time migration: pre-namespaced keys → iou_* keys. Old values were JSON-stringified, same format as new ones.
     (function migrateLegacyStorage() {
-        const moves = [['transactions', STORAGE.TX], ['archivedTransactions', STORAGE.ARCH], ['whomList', STORAGE.WHOM], ['appHeader', STORAGE.APP]];
+        const moves = [['transactions', STORAGE.TX], ['archivedTransactions', STORAGE.ARCH], ['whomList', STORAGE.WHOM]];
         for (const [oldKey, newKey] of moves) {
             const oldVal = localStorage.getItem(oldKey);
             if (oldVal === null) continue;
@@ -23,15 +36,19 @@ function init() {
     let archived = load(STORAGE.ARCH, []);
 
     const peopleList = $('peopleList'), archList = $('archivedList'), balanceEl = $('balance');
-    const amountEl = $('amount'), addBtn = $('addBtn');
-    const archiveAllBtn = $('archiveAllBtn'), resetBtn = $('resetBtn');
-    const appHeader = $('appHeader');
+    const amountEl = $('amount'), addBtn = $('addBtn'), amountPreviewEl = $('amountPreview');
+    const payAllBtn = $('payAllBtn'), resetBtn = $('resetBtn');
     const resetConfirmModalEl = $('resetConfirmModal'), resetConfirmInput = $('resetConfirmInput'), resetConfirmBtn = $('resetConfirmBtn');
-    const archiveConfirmModalEl = $('archiveConfirmModal'), archiveConfirmInput = $('archiveConfirmInput'), archiveConfirmBtn = $('archiveConfirmBtn');
+    const actionConfirmModalEl = $('actionConfirmModal'), actionConfirmTitle = $('actionConfirmTitle'), actionConfirmBody = $('actionConfirmBody'), actionConfirmBtn = $('actionConfirmBtn');
 
-    appHeader.contentEditable = true;
-    appHeader.addEventListener('input', () => save(STORAGE.APP, appHeader.textContent.trim()));
-    appHeader.textContent = load(STORAGE.APP, 'Corner Café — IOUs');
+    function confirmAction({ title, body, confirmLabel = 'Confirm', confirmClass = 'btn-danger', onConfirm }) {
+        actionConfirmTitle.textContent = title;
+        actionConfirmBody.textContent = body;
+        actionConfirmBtn.textContent = confirmLabel;
+        actionConfirmBtn.className = `btn ${confirmClass}`;
+        actionConfirmBtn.onclick = () => { bootstrap.Modal.getOrCreateInstance(actionConfirmModalEl).hide(); onConfirm(); };
+        bootstrap.Modal.getOrCreateInstance(actionConfirmModalEl).show();
+    }
 
     function saveAll() { save(STORAGE.TX, transactions); save(STORAGE.ARCH, archived); }
     function format(v) { return currency.format(v || 0); }
@@ -65,6 +82,25 @@ function init() {
             }
         }
         balanceEl.textContent = format(sum(transactions));
+        renderPayAllBtn();
+    }
+
+    function renderPayAllBtn() {
+        payAllBtn.disabled = transactions.length === 0;
+        payAllBtn.textContent = transactions.length === 0 ? 'Pay all' : `Pay all (${format(sum(transactions))})`;
+    }
+
+    function payAll() {
+        const paidCount = transactions.length;
+        const movedIn = transactions.map(t => ({ ...t, archivedAt: new Date().toISOString() }));
+        archived = archived.concat(movedIn);
+        transactions = [];
+        saveAll(); renderOutstanding(); renderArchived(); drawChart();
+        toastWithUndo('All marked paid', () => {
+            archived = archived.slice(0, archived.length - paidCount);
+            transactions = movedIn.map(({ archivedAt, ...t }) => t);
+            saveAll(); renderOutstanding(); renderArchived(); drawChart();
+        });
     }
 
     function renderArchived() {
@@ -86,39 +122,50 @@ function init() {
     }
 
     function deleteOutstanding(id) {
-        transactions = transactions.filter(t => t.id !== id);
-        saveAll(); renderOutstanding(); drawChart();
-        toast('Deleted');
+        const tx = transactions.find(t => t.id === id);
+        if (!tx) return;
+        confirmAction({
+            title: 'Delete entry?',
+            body: `Delete the ${format(tx.amount)} outstanding entry? This cannot be undone.`,
+            confirmLabel: 'Delete',
+            confirmClass: 'btn-danger',
+            onConfirm: () => {
+                transactions = transactions.filter(t => t.id !== id);
+                saveAll(); renderOutstanding(); drawChart();
+                toast('Deleted');
+            }
+        });
     }
 
+    function renderAmountPreview() {
+        const digitsOnly = amountEl.value.replace(/[^0-9]/g, '');
+        if (digitsOnly !== amountEl.value) amountEl.value = digitsOnly;
+        const parsed = IouLogic.parseAmount(amountEl.value);
+        amountPreviewEl.textContent = parsed === null ? 'Type digits — e.g. 123 = R1.23' : `= ${format(parsed)}`;
+    }
+    amountEl.addEventListener('input', renderAmountPreview);
+
     function addTransaction() {
-        const raw = amountEl.value;
-        if (raw === null || raw === '') { toast('Enter a positive amount'); amountEl.focus(); return; }
-        const parsed = parseFloat(String(raw).replace(',', '.'));
-        if (isNaN(parsed) || parsed <= 0) { toast('Enter a positive amount'); amountEl.focus(); return; }
-        const tx = { id: uid(), whom: '', amount: Math.round(parsed * 100) / 100, date: new Date().toISOString() };
+        const parsed = IouLogic.parseAmount(amountEl.value);
+        if (parsed === null) { toast('Enter a positive amount'); amountEl.focus(); return; }
+        const tx = { id: uid(), whom: '', amount: parsed, date: new Date().toISOString() };
         transactions.push(tx);
         saveAll();
         amountEl.value = '';
+        renderAmountPreview();
         renderOutstanding(); renderArchived(); drawChart();
         toast('Saved');
     }
 
-    archiveAllBtn.addEventListener('click', () => {
-        if (transactions.length === 0) return toast('Nothing to archive');
-        archiveConfirmInput.value = ''; archiveConfirmBtn.disabled = true;
-        bootstrap.Modal.getOrCreateInstance(archiveConfirmModalEl).show();
-        setTimeout(() => archiveConfirmInput.focus(), 200);
-    });
-    archiveConfirmInput.addEventListener('input', () => { archiveConfirmBtn.disabled = archiveConfirmInput.value.trim() !== 'PAY ALL'; });
-    archiveConfirmInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !archiveConfirmBtn.disabled) archiveConfirmBtn.click(); });
-    archiveConfirmBtn.addEventListener('click', () => {
-        if (archiveConfirmInput.value.trim() !== 'PAY ALL') return;
-        archived = archived.concat(transactions.map(t => ({ ...t, archivedAt: new Date().toISOString() })));
-        transactions = [];
-        saveAll(); renderOutstanding(); renderArchived(); drawChart();
-        bootstrap.Modal.getOrCreateInstance(archiveConfirmModalEl).hide();
-        toast('All marked paid');
+    payAllBtn.addEventListener('click', () => {
+        if (transactions.length === 0) return;
+        confirmAction({
+            title: 'Pay all?',
+            body: `Mark all outstanding entries as paid (${format(sum(transactions))})?`,
+            confirmLabel: 'Pay all',
+            confirmClass: 'btn-success',
+            onConfirm: payAll
+        });
     });
 
     resetBtn.addEventListener('click', () => {

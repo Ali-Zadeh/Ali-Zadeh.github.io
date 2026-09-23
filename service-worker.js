@@ -1,10 +1,11 @@
-const CACHE_VERSION = 'v14';
+const CACHE_VERSION = 'v18';
 const CACHE_NAME = `my-app-cache-${CACHE_VERSION}`;
 
 const urlsToCache = [
     '/',
     '/index.html',
     '/index.js',
+    '/logic.js',
     '/bootstrap.min.css',
     '/bootstrap.bundle.min.js',
     '/chart.umd.min.js',
