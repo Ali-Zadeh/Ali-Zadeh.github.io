@@ -92,7 +92,8 @@ function init() {
 
     function payAll() {
         const paidCount = transactions.length;
-        const movedIn = transactions.map(t => ({ ...t, archivedAt: new Date().toISOString() }));
+        const archivedAt = new Date().toISOString();
+        const movedIn = transactions.map(t => ({ ...t, archivedAt }));
         archived = archived.concat(movedIn);
         transactions = [];
         saveAll(); renderOutstanding(); renderArchived(); drawChart();
@@ -112,12 +113,26 @@ function init() {
             archList.appendChild(li);
             return;
         }
-        const sorted = archived.slice().sort((a, b) => new Date(b.archivedAt || b.date) - new Date(a.archivedAt || a.date));
-        for (const t of sorted) {
-            const li = document.createElement('li');
-            li.className = 'list-group-item d-flex justify-content-between align-items-center';
-            li.innerHTML = `<div class="small-muted">Paid: ${new Date(t.archivedAt || t.date).toLocaleDateString()}</div><div>${format(t.amount)}</div>`;
-            archList.appendChild(li);
+        const groups = new Map();
+        for (const t of archived) {
+            const key = t.archivedAt || t.date;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(t);
+        }
+        const sortedKeys = [...groups.keys()].sort((a, b) => new Date(b) - new Date(a));
+        for (const key of sortedKeys) {
+            const items = groups.get(key);
+            const header = document.createElement('li');
+            header.className = 'list-group-item d-flex justify-content-between align-items-center fw-bold';
+            header.style.borderTop = '2px solid var(--surface-contrast)';
+            header.innerHTML = `<span>Paid ${new Date(key).toLocaleDateString()}</span><span>${format(sum(items))}</span>`;
+            archList.appendChild(header);
+            for (const t of items) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex justify-content-between align-items-center ps-4';
+                li.innerHTML = `<div class="small-muted">Added: ${new Date(t.date).toLocaleDateString()}</div><div>${format(t.amount)}</div>`;
+                archList.appendChild(li);
+            }
         }
     }
 
