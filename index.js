@@ -227,6 +227,7 @@ function init() {
 
     window.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); amountEl.focus(); amountEl.select(); } });
     amountEl.focus();
+    requestAnimationFrame(() => requestAnimationFrame(() => amountEl.focus()));
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && !document.querySelector('.modal.show')) amountEl.focus();
     });
